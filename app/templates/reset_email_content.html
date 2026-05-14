@@ -1,0 +1,69 @@
+<!-- Greeting -->
+<h2 style="margin: 0 0 12px; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3;">Password Reset
+    Request</h2>
+<p style="margin: 0 0 16px; font-size: 15px; color: #475569; line-height: 1.7;">
+    Hi <strong style="color: #0f172a;">{user_name}</strong>,
+</p>
+<p style="margin: 0 0 20px; font-size: 15px; color: #475569; line-height: 1.7;">
+    We received a request to reset the password for your <strong style="color: #0f172a;">Smart Timetable</strong>
+    account.
+    No worries &mdash; it happens! Click the button below to create a new password.
+</p>
+
+<!-- Expiry info box -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0;">
+    <tr>
+        <td style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px 22px;">
+            <p
+                style="margin: 0 0 6px; font-size: 12px; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 1px;">
+                &#128274; Secure Reset Link</p>
+            <p style="margin: 0; font-size: 14px; color: #1e293b; line-height: 1.6;">
+                This link is valid for <strong style="color: #10b981;">1 hour only</strong>. After that, you'll need to
+                request a new one.
+            </p>
+        </td>
+    </tr>
+</table>
+
+<!-- CTA Button -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 32px 0;">
+    <tr>
+        <td align="center">
+            <a href="{reset_link}" class="btn-link"
+                style="display:inline-block; padding:15px 44px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color:#ffffff; text-decoration:none; border-radius:10px; font-weight:700; font-size:15px; letter-spacing:0.3px; box-shadow:0 4px 16px rgba(16,185,129,0.30);">
+                &#128275;&nbsp;&nbsp;Reset My Password
+            </a>
+        </td>
+    </tr>
+</table>
+
+<!-- Divider -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 24px 0;">
+    <tr>
+        <td style="height: 1px; background-color: #e2e8f0; font-size: 0; line-height: 0;">&nbsp;</td>
+    </tr>
+</table>
+
+<!-- Fallback link -->
+<p style="margin: 0 0 10px; font-size: 13px; color: #94a3b8; line-height: 1.6;">Button not working? Copy and paste this
+    link into your browser:</p>
+<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td
+            style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #10b981; word-break: break-all; text-align: center;">
+            {reset_link}
+        </td>
+    </tr>
+</table>
+
+<!-- Security warning -->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 24px;">
+    <tr>
+        <td style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 14px 18px;">
+            <p style="margin: 0; font-size: 13px; color: #dc2626; line-height: 1.6;">
+                <strong>&#128680; Security Alert:</strong> If you did not request a password reset, please ignore this
+                email. Your password will remain unchanged.
+            </p>
+        </td>
+    </tr>
+</table>
