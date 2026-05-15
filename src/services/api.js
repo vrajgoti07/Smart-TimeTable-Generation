@@ -137,6 +137,18 @@ export const api = {
         return response.json();
     },
 
+    getActivities: async (limit = 50) => {
+        const response = await fetch(`${API_URL}/admin/activities?limit=${limit}`, {
+            headers: getAuthHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch activities');
+        }
+
+        return response.json();
+    },
+
     // Faculty endpoints
     getAllFaculty: async () => {
         const response = await fetch(`${API_URL}/faculty`, {
@@ -159,6 +171,20 @@ export const api = {
 
         if (!response.ok) {
             throw new Error('Failed to update faculty');
+        }
+
+        return response.json();
+    },
+
+    updateMyAvailability: async (availability) => {
+        const response = await fetch(`${API_URL}/faculty/me/availability`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ availability })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update availability');
         }
 
         return response.json();
@@ -436,6 +462,44 @@ export const api = {
         // Use filename from Content-Disposition header if available
         const disposition = response.headers.get('Content-Disposition');
         let filename = 'timetable.pdf';
+        if (disposition && disposition.indexOf('filename=') !== -1) {
+            const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+            if (matches != null && matches[1]) { 
+                filename = matches[1].replace(/['"]/g, '');
+            }
+        }
+
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+        document.body.removeChild(a);
+    },
+
+    downloadAdminTimetableCSV: async (departmentId = null, semester = null, section = null) => {
+        let url = `${API_URL}${API_ENDPOINTS.TIMETABLE.LIST}/download-csv`;
+        const params = new URLSearchParams();
+        if (departmentId && departmentId !== 'All') params.append('department_id', departmentId);
+        if (semester && semester !== 'All') params.append('semester', semester);
+        if (section && section !== 'All') params.append('section', section);
+        if (params.toString()) url += `?${params.toString()}`;
+
+        const response = await fetch(url, {
+            headers: getAuthHeaders()
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to download CSV');
+        }
+
+        const blob = await response.blob();
+        
+        // Use filename from Content-Disposition header if available
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = 'timetable.csv';
         if (disposition && disposition.indexOf('filename=') !== -1) {
             const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
             if (matches != null && matches[1]) { 

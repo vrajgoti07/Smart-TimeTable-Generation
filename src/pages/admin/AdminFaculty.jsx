@@ -16,6 +16,7 @@ export default function AdminFaculty({ searchQuery }) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [timetable, setTimetable] = useState([]);
     const [selectedDept, setSelectedDept] = useState('All');
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState(null);
@@ -28,9 +29,10 @@ export default function AdminFaculty({ searchQuery }) {
         setIsLoading(true);
         setError('');
         try {
-            const [facultyData, coursesData] = await Promise.all([
+            const [facultyData, coursesData, timetableData] = await Promise.all([
                 api.getAllFaculty(),
-                api.getAllCourses ? api.getAllCourses() : Promise.resolve([])
+                api.getAllCourses ? api.getAllCourses() : Promise.resolve([]),
+                api.getTimetable()
             ]);
 
             // Normalize faculty data
@@ -41,11 +43,12 @@ export default function AdminFaculty({ searchQuery }) {
             }));
 
             setFaculty(normalizedFaculty);
+            setTimetable(timetableData || []);
 
             // Normalize course data
             const normalizedCourses = coursesData.map(c => {
                 let facultyMap = c.faculty || {};
-                
+
                 // Migrate legacy flat format if encountered
                 if (facultyMap.theory || facultyMap.practical) {
                     const primaryBr = c.branch || c.department || c.department_id || 'CSE';
@@ -68,7 +71,7 @@ export default function AdminFaculty({ searchQuery }) {
         }
     };
 
-    // Calculate current assigned hours for a faculty member
+    // Calculate current assigned hours for a faculty member based on course assignments
     const getAssignedHours = (facultyName) => {
         let totalHours = 0;
         courses.forEach(course => {
@@ -84,11 +87,7 @@ export default function AdminFaculty({ searchQuery }) {
             });
         });
 
-        // Also check the faculty's stored current_load from backend
-        const fac = faculty.find(f => f.name === facultyName);
-        const backendLoad = fac?.current_hours || 0;
-
-        return Math.max(totalHours, backendLoad);
+        return totalHours;
     };
 
     const handleEditClick = (fac) => {
@@ -156,6 +155,14 @@ export default function AdminFaculty({ searchQuery }) {
                 [day]: newDaySlots
             }
         });
+    };
+
+    const getScheduleForSlot = (day, time, facultyName) => {
+        return timetable.find(entry =>
+            entry.day_of_week === day &&
+            entry.start_time && entry.start_time.startsWith(time) &&
+            entry.faculty_name === facultyName
+        );
     };
 
     const departments = ['All', ...new Set(faculty.map(f => f.department))];
@@ -311,11 +318,11 @@ export default function AdminFaculty({ searchQuery }) {
                                         <Calendar size={16} className="text-emerald-500" />
                                         Weekly Availability
                                     </h4>
-                                    
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-2">Primary Department</label>
-                                            <select 
+                                            <select
                                                 value={editForm.department}
                                                 onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
                                                 className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
@@ -329,7 +336,7 @@ export default function AdminFaculty({ searchQuery }) {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-2">Expertise / Subjects (Comma separated)</label>
-                                            <input 
+                                            <input
                                                 type="text"
                                                 placeholder="e.g. Mathematics, Calculus, Algebra"
                                                 value={editForm.expertise}
@@ -355,18 +362,32 @@ export default function AdminFaculty({ searchQuery }) {
                                                     <tr key={day} className="border-b border-slate-200/50 last:border-0">
                                                         <td className="font-medium text-slate-700 p-2">{day}</td>
                                                         {TIME_SLOTS.map(slot => {
+                                                            const schedule = getScheduleForSlot(day, slot, fac.name);
                                                             const isAvailable = (editForm.availability[day] || []).includes(slot);
                                                             return (
                                                                 <td key={slot} className="p-1 text-center">
-                                                                    <button
-                                                                        onClick={() => toggleAvailability(day, slot)}
-                                                                        className={`w-full h-8 rounded-md transition-all duration-200 ${isAvailable
-                                                                            ? 'bg-emerald-500 text-white shadow-sm'
-                                                                            : 'bg-white border border-slate-200 hover:border-emerald-300'
-                                                                            }`}
-                                                                    >
-                                                                        {isAvailable && <Check size={14} className="mx-auto" />}
-                                                                    </button>
+                                                                    {schedule ? (
+                                                                        <div className="w-full h-8 rounded-md bg-indigo-50 border border-indigo-200 flex items-center justify-center cursor-not-allowed relative group">
+                                                                            <span className="text-[10px] font-bold text-indigo-700 truncate px-1" title={schedule.course_name}>
+                                                                                Class
+                                                                            </span>
+                                                                            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-1.5 px-2 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-20 shadow-lg border border-slate-700">
+                                                                                <p className="font-bold text-emerald-400">{schedule.course_name}</p>
+                                                                                <p className="text-slate-300 mt-0.5">{schedule.branch || schedule.department_id} S{schedule.semester} {schedule.section ? `Sec ${schedule.section}` : ''}</p>
+                                                                                <p className="text-slate-300">Room: {schedule.room_name}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => toggleAvailability(day, slot)}
+                                                                            className={`w-full h-8 rounded-md transition-all duration-200 ${isAvailable
+                                                                                ? 'bg-emerald-500 text-white shadow-sm'
+                                                                                : 'bg-white border border-slate-200 hover:border-emerald-300'
+                                                                                }`}
+                                                                        >
+                                                                            {isAvailable && <Check size={14} className="mx-auto" />}
+                                                                        </button>
+                                                                    )}
                                                                 </td>
                                                             );
                                                         })}
@@ -375,10 +396,21 @@ export default function AdminFaculty({ searchQuery }) {
                                             </tbody>
                                         </table>
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-4 flex items-center gap-2">
-                                        <AlertCircle size={12} />
-                                        Click slots to toggle availability. Green indicates available times.
-                                    </p>
+                                    <div className="flex items-center gap-4 mt-4">
+                                        <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                            <span className="w-3 h-3 rounded bg-emerald-500 inline-block"></span> Available
+                                        </p>
+                                        <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                            <span className="w-3 h-3 rounded border border-slate-200 bg-white inline-block"></span> Unavailable
+                                        </p>
+                                        <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                            <span className="w-3 h-3 rounded border border-indigo-200 bg-indigo-50 inline-block"></span> Scheduled Class
+                                        </p>
+                                        <p className="text-xs text-slate-400 flex items-center gap-1.5 ml-auto">
+                                            <AlertCircle size={12} />
+                                            Click empty slots to toggle availability.
+                                        </p>
+                                    </div>
                                 </div>
                             )}
 
@@ -390,7 +422,7 @@ export default function AdminFaculty({ searchQuery }) {
                                         {DAYS.map(day => {
                                             const slots = (fac.availability[day] || []);
                                             if (slots.length === 0) return null;
-                                            
+
                                             // Helper to format 09:10 to 9:10 AM
                                             const formatTime = (t) => {
                                                 const [h, m] = t.split(':');

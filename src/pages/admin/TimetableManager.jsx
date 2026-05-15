@@ -108,43 +108,15 @@ export default function TimetableManager() {
         }
     };
 
-    const handleExportCSV = () => {
+    const handleExportCSV = async () => {
         if (masterSchedule.length === 0) return;
 
-        // CSV Headers
-        const headers = ['Day', 'Time', 'Duration', 'Subject', 'Room', 'Faculty', 'Class/Section', 'Type'];
-
-        // Map data to rows
-        const rows = masterSchedule.map(item => [
-            item.day,
-            item.time,
-            `${item.time} - ${item.end_time}`,
-            `"${item.subject.replace(/"/g, '""')}"`,
-            `"${item.room.replace(/"/g, '""')}"`,
-            `"${item.faculty.replace(/"/g, '""')}"`,
-            `"${item.class.replace(/"/g, '""')}"`,
-            item.type
-        ]);
-
-        // Combine headers and rows
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.join(','))
-        ].join('\n');
-
-        // Create blob and download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-
-        const filename = `timetable_${viewBranch}_sem${viewSemester}${viewSection !== 'All' ? '_sec' + viewSection : ''}.csv`;
-
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        try {
+            await api.downloadAdminTimetableCSV(viewBranch, viewSemester, viewSection);
+        } catch (error) {
+            console.error("Failed to export CSV:", error);
+            // Optionally set an error state here
+        }
     };
 
     const generationSteps = [
