@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.security import get_current_user, require_role
+from pydantic import BaseModel
 from app.database import get_database
 from app.models.faculty import FacultyCreate, FacultyResponse
 from typing import List
@@ -209,6 +210,40 @@ async def get_faculty_dashboard(user: dict = Depends(get_current_user)):
         "fullSchedule": schedule,
         "courses": courses
     }
+
+class AvailabilityUpdate(BaseModel):
+    availability: Dict[str, List[str]]
+
+@router.put("/me/availability")
+async def update_my_availability(
+    data: AvailabilityUpdate,
+    user: dict = Depends(get_current_user)
+):
+    if user.get("role") != "Faculty":
+        raise HTTPException(status_code=403, detail="Faculty access required")
+    
+    db = get_database()
+    
+    fac_result = await db.faculty.update_one(
+        {"email": user["sub"]},
+        {"$set": {"availability": data.availability}}
+    )
+    
+    user_result = await db.users.update_one(
+        {"email": user["sub"]},
+        {"$set": {"availability": data.availability}}
+    )
+    
+    if fac_result.matched_count == 0 and user_result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    await ActivityService.log_activity(
+        action="Updated their availability schedule",
+        user=user.get("name", "Faculty"),
+        type="info"
+    )
+    
+    return {"message": "Availability updated successfully"}
 
 @router.get("/download-timetable-pdf")
 async def download_faculty_timetable_pdf(user: dict = Depends(get_current_user)):

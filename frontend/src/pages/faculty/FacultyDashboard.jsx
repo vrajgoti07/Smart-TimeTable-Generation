@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, Clock, BookOpen, TrendingUp, ArrowRight, ChevronRight, Sparkles } from 'lucide-react';
+import { Calendar, Users, Clock, BookOpen, TrendingUp, ArrowRight, ChevronRight, Sparkles, Save, Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
 
 import FacultyCourses from './FacultyCourses';
 import FacultySchedule from './FacultySchedule';
 
-export default function FacultyDashboard({ currentPage, searchQuery }) {
+export default function FacultyDashboard({ currentPage, searchQuery, onNavigate }) {
     if (currentPage === 'courses') {
         return <FacultyCourses searchQuery={searchQuery} />;
     }
@@ -27,19 +27,24 @@ export default function FacultyDashboard({ currentPage, searchQuery }) {
         );
     }
 
-    return <FacultyOverview />;
+    return <FacultyOverview onNavigate={onNavigate} />;
 }
 
-function FacultyOverview() {
-    const [dashData, setDashData] = useState(null);
+function FacultyOverview({ onNavigate }) {
+    const [dashData, setDashData] = React.useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [editedAvailability, setEditedAvailability] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const fetchData = async () => {
         try {
             setLoading(true);
             const data = await api.getFacultyDashboard();
             setDashData(data);
+            if (!editedAvailability) {
+                setEditedAvailability(data.availability || {});
+            }
             setError(null);
         } catch (err) {
             console.error('Failed to load faculty dashboard:', err);
@@ -55,6 +60,29 @@ function FacultyOverview() {
         const interval = setInterval(fetchData, 30000);
         return () => clearInterval(interval);
     }, []);
+
+    const handleSaveAvailability = async () => {
+        try {
+            setIsSaving(true);
+            await api.updateMyAvailability(editedAvailability);
+            const data = await api.getFacultyDashboard();
+            setDashData(data);
+        } catch (err) {
+            console.error('Failed to save availability:', err);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const toggleSlot = (day, time) => {
+        setEditedAvailability(prev => {
+            const currentDaySlots = prev[day] || [];
+            const newDaySlots = currentDaySlots.includes(time)
+                ? currentDaySlots.filter(t => t !== time)
+                : [...currentDaySlots, time];
+            return { ...prev, [day]: newDaySlots };
+        });
+    };
 
     if (loading && !dashData) {
         return (
@@ -245,6 +273,12 @@ function FacultyOverview() {
                             <h3 className="font-bold text-slate-900 text-lg">Today's Schedule</h3>
                             <p className="text-sm text-slate-500 mt-0.5">{dayName}, {now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</p>
                         </div>
+                        <button 
+                            onClick={() => onNavigate && onNavigate('schedule')}
+                            className="flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
+                        >
+                            View all <ChevronRight size={16} />
+                        </button>
                     </div>
 
                     <div className="divide-y divide-slate-100">
@@ -348,7 +382,17 @@ function FacultyOverview() {
 
                             {/* Mini Availability Grid */}
                             <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Your Availability</p>
+                                <div className="flex justify-between items-center mb-3">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Your Availability</p>
+                                    <button 
+                                        onClick={handleSaveAvailability}
+                                        disabled={isSaving}
+                                        className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-[10px] font-bold transition-colors disabled:opacity-50"
+                                    >
+                                        {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                        Save Changes
+                                    </button>
+                                </div>
                                 <div className="grid grid-cols-6 gap-1 min-w-[200px]">
                                     <div className="w-8"></div>
                                     {timeSlots.map(t => (
@@ -359,19 +403,20 @@ function FacultyOverview() {
                                         <React.Fragment key={day}>
                                             <div className="text-[9px] font-medium text-slate-500">{day.slice(0, 3)}</div>
                                             {timeSlots.map(time => {
-                                                const isAvailable = (dashData.availability?.[day] || []).includes(time);
+                                                const isAvailable = (editedAvailability?.[day] || []).includes(time);
                                                 return (
                                                     <div 
                                                         key={`${day}-${time}`}
-                                                        className={`h-4 rounded-sm border ${isAvailable ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-100 border-slate-200'}`}
-                                                        title={`${day} ${time}: ${isAvailable ? 'Available' : 'Busy'}`}
+                                                        onClick={() => toggleSlot(day, time)}
+                                                        className={`h-4 rounded-sm border cursor-pointer transition-colors ${isAvailable ? 'bg-emerald-500 border-emerald-600 hover:bg-emerald-600' : 'bg-slate-100 border-slate-200 hover:bg-slate-200'}`}
+                                                        title={`${day} ${time}: Click to toggle availability`}
                                                     />
                                                 );
                                             })}
                                         </React.Fragment>
                                     ))}
                                 </div>
-                                <p className="text-[9px] text-slate-400 mt-3 italic text-center">Contact Admin to update your availability grid.</p>
+                                <p className="text-[9px] text-slate-400 mt-3 italic text-center">Click the cells to mark your available time slots.</p>
                             </div>
                         </div>
                     </div>

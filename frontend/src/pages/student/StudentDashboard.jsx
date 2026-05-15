@@ -6,7 +6,7 @@ import StudentCourses from './StudentCourses';
 import StudentProfile from './StudentProfile';
 import StudentTimetable from './StudentTimetable';
 
-export default function StudentDashboard({ currentPage, searchQuery }) {
+export default function StudentDashboard({ currentPage, searchQuery, onNavigate }) {
     const [dashboardData, setDashboardData] = React.useState(null);
     const [isLoading, setIsLoading] = React.useState(true);
 
@@ -169,7 +169,10 @@ export default function StudentDashboard({ currentPage, searchQuery }) {
                             <h3 className="font-bold text-slate-900 text-lg">Today's Schedule</h3>
                             <p className="text-sm text-slate-500 mt-0.5">{day}, {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</p>
                         </div>
-                        <button className="flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors">
+                        <button 
+                            onClick={() => onNavigate && onNavigate('timetable')}
+                            className="flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
+                        >
                             View all <ChevronRight size={16} />
                         </button>
                     </div>

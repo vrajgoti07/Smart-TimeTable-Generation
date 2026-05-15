@@ -70,6 +70,16 @@ async def get_metrics_history(limit: int = 60, user: dict = Depends(get_current_
     
     return await MonitoringService.get_metrics_history(limit=limit)
 
+@router.get("/activities")
+async def get_all_activities(limit: int = 50, user: dict = Depends(get_current_user)):
+    """
+    Get system activities history
+    """
+    if user.get("role") != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    return await ActivityService.get_recent_activities(limit=limit)
+
 from app.models.user import UserInvite
 from app.utils.email import send_invite_email
 import secrets

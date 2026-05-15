@@ -9,6 +9,8 @@ from app.services.notification_service import NotificationService
 from app.services.activity_service import ActivityService
 from fastapi import Response
 from app.utils.pdf_generator import generate_timetable_pdf
+import csv
+from io import StringIO
 
 router = APIRouter()
 
@@ -221,6 +223,83 @@ async def download_timetable_pdf(
     return Response(
         content=pdf_content,
         media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+@router.get("/download-csv")
+async def download_timetable_csv(
+    department_id: Optional[str] = None,
+    branch: Optional[str] = None,
+    semester: Optional[str] = None,
+    section: Optional[str] = None,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Generate and download a CSV file of the timetable.
+    """
+    if user["role"] != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_database()
+    query = {}
+    
+    dept_id = branch if branch and branch != "All" else department_id if department_id and department_id != "All" else None
+    
+    if dept_id:
+        query["department_id"] = dept_id
+    if semester and semester != "All":
+        try:
+            query["semester"] = int(semester)
+        except: pass
+    if section and section != "All":
+        query["section"] = section
+
+    schedule_data = await db.timetable.find(query).to_list(length=1000)
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Headers
+    writer.writerow(['Day', 'Time', 'Duration', 'Subject', 'Room', 'Faculty', 'Class/Section', 'Type'])
+    
+    for item in schedule_data:
+        time_str = item.get("time", "")
+        end_time_str = item.get("end_time", "")
+        duration = f"{time_str} - {end_time_str}" if end_time_str else time_str
+        
+        class_sec = f"{item.get('department_id', '')} {item.get('semester', '')}-{item.get('section', '')}"
+        if item.get("class"):
+            class_sec = item.get("class")
+            
+        writer.writerow([
+            item.get("day", ""),
+            time_str,
+            duration,
+            item.get("subject", ""),
+            item.get("room", ""),
+            item.get("faculty", ""),
+            class_sec,
+            item.get("type", "Lecture")
+        ])
+        
+    filename_parts = ["timetable"]
+    if dept_id: filename_parts.append(dept_id)
+    if semester and semester != "All": filename_parts.append(f"sem{semester}")
+    if section and section != "All": filename_parts.append(f"sec{section}")
+    filename = "_".join(filename_parts) + ".csv"
+    
+    # Log activity
+    await ActivityService.log_activity(
+        action=f"Exported CSV Timetable for {dept_id or 'All'}",
+        user=user.get("name", "Admin"),
+        type="info"
+    )
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
         headers={
             "Content-Disposition": f"attachment; filename={filename}"
         }

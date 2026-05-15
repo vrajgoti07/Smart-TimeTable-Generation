@@ -18,6 +18,9 @@ export default function AdminDashboard({ currentPage, onNavigate, searchQuery })
     const [selectedMetric, setSelectedMetric] = useState(null); // 'serverLoad' or 'memoryUsage'
     const [metricsHistory, setMetricsHistory] = useState([]);
     const [isPolling, setIsPolling] = useState(false);
+    const [isActivitiesModalOpen, setIsActivitiesModalOpen] = useState(false);
+    const [allActivities, setAllActivities] = useState([]);
+    const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
     useEffect(() => {
         if (currentPage === 'overview') {
@@ -57,6 +60,16 @@ export default function AdminDashboard({ currentPage, onNavigate, searchQuery })
             }
         } catch (err) {
             console.error("Failed to poll metrics:", err);
+            setDashboardData(prev => prev ? ({
+                ...prev,
+                systemStatus: {
+                    ...prev.systemStatus,
+                    dbStatus: 'Offline',
+                    serverLoad: 0,
+                    memoryUsage: 0,
+                    dbLatency: '—'
+                }
+            }) : null);
         }
     };
 
@@ -83,6 +96,19 @@ export default function AdminDashboard({ currentPage, onNavigate, searchQuery })
             setMetricsHistory(history);
         } catch (err) {
             console.error("Failed to fetch history:", err);
+        }
+    };
+
+    const handleViewAllActivities = async () => {
+        setIsActivitiesModalOpen(true);
+        setIsLoadingActivities(true);
+        try {
+            const data = await api.getActivities(50);
+            setAllActivities(data);
+        } catch (err) {
+            console.error("Failed to fetch all activities", err);
+        } finally {
+            setIsLoadingActivities(false);
         }
     };
 
@@ -160,7 +186,15 @@ export default function AdminDashboard({ currentPage, onNavigate, searchQuery })
         },
     ];
 
-    const recentActivities = dashboardData?.recentActivities || [];
+    const filterActivity = (activity) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (activity.action || '').toLowerCase().includes(query) || 
+               (activity.user || '').toLowerCase().includes(query);
+    };
+
+    const recentActivities = (dashboardData?.recentActivities || []).filter(filterActivity);
+    const filteredAllActivities = allActivities.filter(filterActivity);
 
     if (isLoading) {
         return (
@@ -188,9 +222,11 @@ export default function AdminDashboard({ currentPage, onNavigate, searchQuery })
                     <h1 className="text-3xl font-bold text-slate-900 mb-1">Dashboard Overview</h1>
                     <p className="text-slate-500">Welcome back, Admin. Here's what's happening today.</p>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-sm font-medium text-emerald-700">System Online</span>
+                <div className={`flex items-center gap-2 px-4 py-2 border rounded-xl ${dashboardData?.systemStatus?.dbStatus === 'Offline' ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${dashboardData?.systemStatus?.dbStatus === 'Offline' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                    <span className={`text-sm font-medium ${dashboardData?.systemStatus?.dbStatus === 'Offline' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {dashboardData?.systemStatus?.dbStatus === 'Offline' ? 'System Offline' : 'System Online'}
+                    </span>
                 </div>
             </div>
 
@@ -274,7 +310,10 @@ export default function AdminDashboard({ currentPage, onNavigate, searchQuery })
                             <Activity className="w-5 h-5 text-emerald-500" />
                             Recent Activities
                         </h3>
-                        <button className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 hover:underline">
+                        <button 
+                            onClick={handleViewAllActivities}
+                            className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 hover:underline"
+                        >
                             View all <ArrowUpRight size={14} />
                         </button>
                     </div>
@@ -418,6 +457,60 @@ export default function AdminDashboard({ currentPage, onNavigate, searchQuery })
                                         <p className="text-2xl font-bold text-emerald-600">Optimal</p>
                                     </div>
                                 </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {isActivitiesModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                        <motion.div 
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+                        >
+                            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                                        <Activity size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-900">All Recent Activities</h3>
+                                        <p className="text-xs text-slate-500">System activity log</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setIsActivitiesModalOpen(false)}
+                                    className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="p-6 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-200">
+                                {isLoadingActivities ? (
+                                    <div className="flex items-center justify-center h-32">
+                                        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                                    </div>
+                                ) : filteredAllActivities.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {filteredAllActivities.map((activity, i) => (
+                                            <div key={i} className="flex items-start gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors border border-slate-100 group">
+                                                <div className={`w-3 h-3 rounded-full mt-1.5 ${activity.type === 'success' ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-slate-800 group-hover:text-slate-900">{activity.action}</p>
+                                                    <p className="text-xs text-slate-500 mt-1">by {activity.user}</p>
+                                                </div>
+                                                <span className="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg whitespace-nowrap">{activity.time}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12 text-slate-500">
+                                        <Activity className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                                        <p>No activities found.</p>
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     </div>
